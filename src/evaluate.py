@@ -6,6 +6,11 @@ from pathlib import Path
 from sklearn.metrics import classification_report, confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
+import sys
+
+# ensure we can import prepare_features from src
+sys.path.insert(0, str(Path(__file__).resolve().parents[0] / "src"))
+from features import prepare_features
 
 MODEL = Path("models/crop_rf_search.joblib")
 DATA_CORE = Path("data/raw/data_core.csv")
@@ -16,22 +21,48 @@ def load_holdout_and_model():
     search = joblib.load(MODEL)
     best = search.best_estimator_
 
+    # load and prepare features exactly as training
     df = pd.read_csv(DATA_CORE)
-    # import prepare_features from src (this file is in src)
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[0] / "src"))
-    from features import prepare_features
     df = prepare_features(df)
 
+    # align column names (Temperature typo) - same logic as demo
+    if "Temparature" in best.named_steps["pre"].feature_names_in_ and "Temperature" in df.columns:
+        # rename if needed (but training used Temparature so ensure df matches)
+        df = df.rename(columns={"Temperature": "Temparature"})
+
     if "Crop Type" not in df.columns:
-        raise ValueError("expected 'Crop Type' in data_core.csv")
+        raise ValueError("expected 'Crop Type' in data_core.csv after prepare_features")
 
     X = df.drop(columns=["Crop Type"])
     y = df["Crop Type"].astype(str)
 
     # reproduce same split used in training
     from sklearn.model_selection import train_test_split
-    X_train, X_hold, y_train, y_hold = train_test_split(X, y, test_size=0.15, random_state=42, stratify=y)
+    X_train, X_hold, y_train, y_hold = train_test_split(
+        X, y, test_size=0.15, random_state=42, stratify=y
+    )
+
+    # Ensure X_hold contains all columns expected by the pipeline preprocessor.
+    pre = best.named_steps["pre"]
+    expected_cols = list(pre.feature_names_in_)
+    # if feature_names_in_ missing, fall back to transformer's defined lists
+    if not expected_cols:
+        try:
+            expected_cols = list(pre.transformers_[0][2]) + list(pre.transformers_[1][2])
+        except Exception:
+            expected_cols = list(X.columns)
+
+    # Add any missing expected columns with safe defaults
+    for c in expected_cols:
+        if c not in X_hold.columns:
+            if c in X_hold.select_dtypes(include=["number"]).columns:
+                X_hold[c] = 0
+            else:
+                X_hold[c] = "missing"
+
+    # Reorder X_hold to expected order
+    X_hold = X_hold[expected_cols]
+
     return search, best, X_hold, y_hold
 
 def evaluate():

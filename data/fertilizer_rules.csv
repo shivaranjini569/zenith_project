@@ -1,0 +1,9 @@
+crop,soil_behavior,fertilizer,rate_kg_acre,logic_note
+Maize,NITROGEN_DEFICIENT,Urea,40,Supports early vegetative growth
+Maize,BALANCED,Urea,25,Maintenance dose only
+Maize,LOW_RETENTION,Urea,20,Split application to reduce leaching
+Paddy,HIGH_RETENTION,Urea,35,Suitable for water-retentive soils
+Paddy,BALANCED,Urea,30,Standard recommendation
+Groundnut,PHOSPHORUS_STRESSED,DAP,35,Improves root and pod development
+Millet,LOW_RETENTION,DAP,20,Low input crop for dry soils
+Cotton,BALANCED,14-35-14,30,Balanced nutrient support
